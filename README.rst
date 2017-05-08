@@ -21,6 +21,11 @@ Kafka gConsumer
 gEvent compatible Kafka Consumer for Python 2
 
 
+Provides a Consumer that is launched in a separate process to remove the
+blocking ``consumer.poll()`` method from a non-blocking concurrency event loop.
+This is written for the gEvent_ concurrency engine.
+
+
 * Free software: MIT license
 * Documentation: https://kafka-gconsumer.readthedocs.io.
 
@@ -37,4 +42,5 @@ This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypack
 
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
 .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
+.. _gEvent: http://www.gevent.org
 

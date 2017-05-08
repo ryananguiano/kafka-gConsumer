@@ -68,7 +68,8 @@ def produced_avro_messages(topic):
 def many_produced_messages(producer_settings):
     producer = Producer(**producer_settings)
     for i in xrange(5):
-        producer.produce('test_messages', 'test123-{}'.format(i))
+        producer.produce('test_messages', 'test-{}'.format(i))
+    producer.poll(timeout=5)
 
 
 def test_consumer_settings(consumer_settings):

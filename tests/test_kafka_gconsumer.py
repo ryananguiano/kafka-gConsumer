@@ -7,6 +7,7 @@ Tests for `kafka_gconsumer` module.
 """
 
 import os
+import gevent
 import pytest
 import random
 import string
@@ -29,7 +30,7 @@ def consumer_settings():
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def producer_settings():
     return {
         'bootstrap.servers': os.environ.get('KAFKA_BOOTSTRAP_SERVERS'),
@@ -63,6 +64,24 @@ def produced_avro_messages(topic):
     pass
 
 
-def test_producer(producer_settings):
+@pytest.fixture(scope='session')
+def many_produced_messages(producer_settings):
     producer = Producer(**producer_settings)
-    producer.produce('test_messages', 'test123')
+    for i in xrange(5):
+        producer.produce('test_messages', 'test123-{}'.format(i))
+
+
+def test_consumer_settings(consumer_settings):
+    Consumer(*consumer_settings)
+
+
+def test_avro_consumer_settings(avro_consumer_settings):
+    AvroConsumer(avro_consumer_settings)
+
+
+def test_consumer(many_produced_messages, consumer_settings):
+    def read_message(message):
+        assert message.value() == ''
+    thread = Consumer.spawn(topics='test_messages', settings=consumer_settings, handler=read_message)
+    gevent.sleep(10)
+    gevent.kill(thread)

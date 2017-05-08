@@ -66,10 +66,7 @@ class BaseConsumer(object):
     @classmethod
     def spawn(cls, *args, **kwargs):
         consumer = cls(*args, **kwargs)
-        try:
-            consumer.run()
-        finally:
-            consumer.teardown()
+        return consumer.start()
 
     def __init__(self, topics=None, settings=None, handler=None, commit_on_complete=None,
                  async_commit=None, poll_timeout=None):
@@ -79,6 +76,11 @@ class BaseConsumer(object):
         self.commit_on_complete = self.commit_on_complete if commit_on_complete is None else commit_on_complete
         self.async_commit = self.async_commit if async_commit is None else async_commit
         self.poll_timeout = self.poll_timeout if poll_timeout is None else poll_timeout
+
+    def start(self):
+        self.thread = gevent.spawn(self.run)
+        gevent.signal(signal.SIGTERM, self.thread.kill)
+        return self.thread
 
     def run(self):
         try:
@@ -100,7 +102,6 @@ class BaseConsumer(object):
             self.teardown()
 
     def setup(self):
-        gevent.signal(signal.SIGTERM, self.teardown)
         self.queue_read, self.queue_write = gipc.pipe()
         self.loop = gipc.start_process(target=ConsumerBlockingLoop.spawn,
                                        args=(self.get_worker_settings(),
@@ -135,6 +136,7 @@ class BaseConsumer(object):
             'enable.auto.commit': False,
             'api.version.request': True,
             'broker.version.fallback': '0.9.0',
+            'default.topic.config': {},
         }
         return generate_consumer_settings(initial_settings, self.consumer_settings, self.required_settings)
 

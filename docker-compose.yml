@@ -1,0 +1,81 @@
+---
+version: '1'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:3.2.1
+    network_mode: host
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 32181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:3.2.1
+    network_mode: host
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: localhost:32181
+      # If you want to interact with the Kafka broker *from your host*, then on
+      # operating systems that require the use of Docker Machine (Mac OS and Windows OS)
+      # you must first override the environment variable KAFKA_ADVERTISED_IP to the
+      # IP address of the Docker Machine VM before starting the services via
+      # `docker-compose up -d`.
+      #
+      # You do not need to override the environment variable for interacting with the
+      # Kafka Music application, ZooKeeper, or Confluent Schema Registry.
+      #
+      # For example, if the Docker Machine is named "confluent":
+      #
+      #    $ KAFKA_ADVERTISED_IP=`docker-machine ip confluent 2>/dev/null || echo localhost` docker-compose up -d
+      #
+      # The default value is set in the `.env` file in this directory because
+      # in the Docker Compose v2.0 file format, the `${VARIABLE:-defaultValue}`
+      # syntax is not supported yet.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_ADVERTISED_IP}:29092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:3.2.1
+    network_mode: host
+    depends_on:
+      - zookeeper
+      - kafka
+    ports:
+      - '8081'
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: localhost
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: localhost:32181
+
+  kafka-create-topics:
+    image: confluentinc/cp-kafka:3.2.1
+    depends_on:
+      - kafka
+    network_mode: host
+    command: "bash -c 'echo Waiting for Kafka to be ready... && \
+                       cub kafka-ready -b localhost:29092 1 20 && \
+                       kafka-topics --create --topic play-events --if-not-exists --zookeeper localhost:32181 --partitions 4 --replication-factor 1 && \
+                       kafka-topics --create --topic song-feed --if-not-exists --zookeeper localhost:32181 --partitions 4 --replication-factor 1 && \
+                       sleep infinity'"
+    environment:
+      KAFKA_BROKER_ID: ignored
+      KAFKA_ZOOKEEPER_CONNECT: ignored
+
+  kafka-gconsumer-tests:
+    build: .
+    image: kafka-gconsumer
+    network_mode: host
+    depends_on:
+      - kafka
+      - schema-registry
+      - kafka-create-topics
+    command: "bash -c 'echo Waiting for Kafka to be ready... && \
+                       cub kafka-ready -b localhost:29092 1 20 && \
+                       echo Waiting for Confluent Schema Registry to be ready... && \
+                       cub sr-ready localhost 8081 20 && \
+                       echo Waiting a few seconds for topic creation to finish... && \
+                       sleep 2 && \
+                       py.test'"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: localhost:29092
+      KAFKA_SCHEMA_REGISTRY_URL: http://localhost:8081

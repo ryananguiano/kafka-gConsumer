@@ -1,0 +1,4 @@
+confluent-kafka[avro]==0.9.4
+gevent==1.2.1
+gipc==0.6.0
+requests==2.13.0
